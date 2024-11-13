@@ -165,7 +165,7 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
           <div className={classNames(styles.Chat, 'flex flex-col flex-grow min-w-[var(--chat-min-width)] h-full')}>
             {!chatStarted && (
               <div id="intro" className="mt-[26vh] max-w-chat mx-auto text-center">
-                <h1 className="text-6xl font-bold text-bolt-elements-textPrimary mb-4 animate-fade-in">
+                <h1 className="text-6xl font-bold bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent mb-4 animate-fade-in">
                   Where ideas begin
                 </h1>
                 <p className="text-xl mb-8 text-bolt-elements-textSecondary animate-fade-in animation-delay-200">
@@ -235,7 +235,7 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                       minHeight: TEXTAREA_MIN_HEIGHT,
                       maxHeight: TEXTAREA_MAX_HEIGHT,
                     }}
-                    placeholder="How can Bolt help you today?"
+                    placeholder="How can Matt AI help you today?"
                     translate="no"
                   />
                   <ClientOnly>
