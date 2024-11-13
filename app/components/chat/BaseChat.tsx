@@ -13,6 +13,11 @@ import { SendButton } from './SendButton.client';
 import { useState } from 'react';
 import { APIKeyManager } from './APIKeyManager';
 import Cookies from 'js-cookie';
+import { setupGitHubProject } from '../../utils/github';
+import { toast } from 'react-toastify';
+import { createScopedLogger } from '~/utils/logger';
+
+const logger = createScopedLogger('BaseChat');
 
 import styles from './BaseChat.module.scss';
 
@@ -117,6 +122,12 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
   ) => {
     const TEXTAREA_MAX_HEIGHT = chatStarted ? 400 : 200;
     const [apiKeys, setApiKeys] = useState<Record<string, string>>({});
+    const [showGithubForm, setShowGithubForm] = useState(false);
+    const [githubUsername, setGithubUsername] = useState('');
+    const [githubRepo, setGithubRepo] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const [loadingStatus, setLoadingStatus] = useState('');
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
       // Load API keys from cookies on component mount
@@ -147,7 +158,68 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
           path: '/' // Accessible across the site
         });
       } catch (error) {
-        console.error('Error saving API keys to cookies:', error);
+        console.error('Error saving API keys from cookies:', error);
+      }
+    };
+
+    const handleGithubSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      logger.debug('Form submitted');
+      console.log('Form submitted');
+
+      if (!githubUsername || !githubRepo) {
+        logger.debug('Missing required fields');
+        console.log('Missing required fields');
+        return;
+      }
+      
+      setIsLoading(true);
+      setError(null);
+      setLoadingStatus('Initializing...');
+      
+      logger.debug(`Starting GitHub project setup: ${githubUsername}/${githubRepo}`);
+      console.log(`Starting GitHub project setup: ${githubUsername}/${githubRepo}`);
+
+      try {
+        // Load the GitHub repository files into the WebContainer
+        setLoadingStatus('Loading repository files...');
+        logger.debug('Calling setupGitHubProject...');
+        console.log('Calling setupGitHubProject...');
+        
+        const result = await setupGitHubProject(githubUsername, githubRepo).catch(error => {
+          logger.error('Error in setupGitHubProject:', error);
+          console.error('Error in setupGitHubProject:', error);
+          throw error;
+        });
+        
+        logger.debug('Repository files loaded successfully:', result);
+        console.log('Repository files loaded successfully:', result);
+        
+        // Start a chat session about the loaded project
+        setLoadingStatus('Starting chat session...');
+        const message = `I've loaded the GitHub repository ${githubUsername}/${githubRepo}. The files are now available in the WebContainer. Please help me analyze and modify this project.`;
+        
+        logger.debug('Starting chat session with message:', message);
+        console.log('Starting chat session with message:', message);
+        
+        // Create a synthetic event for sendMessage
+        const syntheticEvent = new Event('click') as any;
+        await sendMessage?.(syntheticEvent, message);
+        
+        setShowGithubForm(false);
+        logger.debug('GitHub project setup completed');
+        console.log('GitHub project setup completed');
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+        logger.error('Error in GitHub project setup:', errorMessage);
+        console.error('Error in GitHub project setup:', errorMessage);
+        setError(errorMessage);
+        toast.error(`Failed to load GitHub repository: ${errorMessage}`);
+      } finally {
+        setIsLoading(false);
+        setLoadingStatus('');
       }
     };
 
@@ -171,6 +243,78 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                 <p className="text-xl mb-8 text-bolt-elements-textSecondary animate-fade-in animation-delay-200">
                   Bring ideas to life in seconds or get help on existing projects.
                 </p>
+                {!showGithubForm ? (
+                  <button
+                    onClick={() => {
+                      logger.debug('Opening GitHub form');
+                      console.log('Opening GitHub form');
+                      setShowGithubForm(true);
+                    }}
+                    className="px-6 py-3 bg-gradient-to-r from-indigo-500 to-violet-500 text-white rounded-lg hover:opacity-90 transition-opacity animate-fade-in animation-delay-300"
+                  >
+                    Continue with an existing project
+                  </button>
+                ) : (
+                  <form onSubmit={handleGithubSubmit} className="flex flex-col gap-4 max-w-md mx-auto animate-fade-in">
+                    <input
+                      type="text"
+                      placeholder="GitHub Username"
+                      value={githubUsername}
+                      onChange={(e) => setGithubUsername(e.target.value)}
+                      className="px-4 py-2 rounded-lg border border-bolt-elements-borderColor bg-bolt-elements-prompt-background text-bolt-elements-textPrimary focus:outline-none focus:ring-2 focus:ring-bolt-elements-focus"
+                      disabled={isLoading}
+                    />
+                    <input
+                      type="text"
+                      placeholder="Repository Name"
+                      value={githubRepo}
+                      onChange={(e) => setGithubRepo(e.target.value)}
+                      className="px-4 py-2 rounded-lg border border-bolt-elements-borderColor bg-bolt-elements-prompt-background text-bolt-elements-textPrimary focus:outline-none focus:ring-2 focus:ring-bolt-elements-focus"
+                      disabled={isLoading}
+                    />
+                    <div className="flex flex-col gap-2">
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            logger.debug('Canceling GitHub form');
+                            console.log('Canceling GitHub form');
+                            setShowGithubForm(false);
+                            setError(null);
+                          }}
+                          className="flex-1 px-4 py-2 border border-bolt-elements-borderColor rounded-lg hover:bg-bolt-elements-background-depth-2 transition-colors"
+                          disabled={isLoading}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={!githubUsername || !githubRepo || isLoading}
+                          className="flex-1 px-4 py-2 bg-gradient-to-r from-indigo-500 to-violet-500 text-white rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {isLoading ? (
+                            <div className="flex items-center justify-center">
+                              <div className="i-svg-spinners:90-ring-with-bg text-xl animate-spin mr-2" />
+                              Loading...
+                            </div>
+                          ) : (
+                            'Go'
+                          )}
+                        </button>
+                      </div>
+                      {loadingStatus && (
+                        <div className="text-sm text-bolt-elements-textSecondary text-center">
+                          {loadingStatus}
+                        </div>
+                      )}
+                      {error && (
+                        <div className="text-sm text-red-500 text-center">
+                          {error}
+                        </div>
+                      )}
+                    </div>
+                  </form>
+                )}
               </div>
             )}
             <div
