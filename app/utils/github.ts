@@ -56,7 +56,8 @@ export async function setupGitHubProject(username: string, repo: string) {
     // Fetch content info from GitHub API
     const response = await fetch(apiUrl, {
       headers: {
-        'Accept': 'application/vnd.github.v3+json'
+        'Accept': 'application/vnd.github.v3+json',
+        'Authorization': `token ${import.meta.env.VITE_GITHUB_TOKEN}`
       }
     });
 
