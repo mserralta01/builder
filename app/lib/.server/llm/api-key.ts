@@ -39,13 +39,15 @@ export function getAPIKey(cloudflareEnv: Env, provider: string, userApiKeys?: Re
 }
 
 export function getBaseURL(cloudflareEnv: Env, provider: string) {
+  const isProduction = env.NODE_ENV === 'production';
+  
   switch (provider) {
     case 'OpenAILike':
       return env.OPENAI_LIKE_API_BASE_URL || cloudflareEnv.OPENAI_LIKE_API_BASE_URL;
     case 'LMStudio':
-      return env.LMSTUDIO_API_BASE_URL || cloudflareEnv.LMSTUDIO_API_BASE_URL || "http://localhost:1234";
+      return env.LMSTUDIO_API_BASE_URL || cloudflareEnv.LMSTUDIO_API_BASE_URL || (isProduction ? "https://localhost:1234" : "http://localhost:1234");
     case 'Ollama':
-        let baseUrl = env.OLLAMA_API_BASE_URL || cloudflareEnv.OLLAMA_API_BASE_URL || "http://localhost:11434";
+        let baseUrl = env.OLLAMA_API_BASE_URL || cloudflareEnv.OLLAMA_API_BASE_URL || (isProduction ? "https://localhost:11434" : "http://localhost:11434");
         if (env.RUNNING_IN_DOCKER === 'true') {
           baseUrl = baseUrl.replace("localhost", "host.docker.internal");
         }

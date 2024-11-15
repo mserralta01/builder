@@ -54,7 +54,8 @@ const staticModels: ModelInfo[] = [
 export let MODEL_LIST: ModelInfo[] = [...staticModels];
 
 const getOllamaBaseUrl = () => {
-  const defaultBaseUrl = import.meta.env.OLLAMA_API_BASE_URL || 'http://localhost:11434';
+  const isProduction = import.meta.env.NODE_ENV === 'production';
+  const defaultBaseUrl = import.meta.env.OLLAMA_API_BASE_URL || (isProduction ? 'https://localhost:11434' : 'http://localhost:11434');
   // Check if we're in the browser
   if (typeof window !== 'undefined') {
     // Frontend always uses localhost
@@ -110,8 +111,9 @@ async function getOpenAILikeModels(): Promise<ModelInfo[]> {
 }
 
 async function getLMStudioModels(): Promise<ModelInfo[]> {
+  const isProduction = import.meta.env.NODE_ENV === 'production';
   try {
-    const base_url = import.meta.env.LMSTUDIO_API_BASE_URL || "http://localhost:1234";
+    const base_url = import.meta.env.LMSTUDIO_API_BASE_URL || (isProduction ? "https://localhost:1234" : "http://localhost:1234");
     const response = await fetch(`${base_url}/v1/models`);
     const data = await response.json() as any;
     return data.data.map((model: any) => ({
