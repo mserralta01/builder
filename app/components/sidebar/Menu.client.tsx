@@ -9,6 +9,9 @@ import { cubicEasingFn } from '~/utils/easings';
 import { logger } from '~/utils/logger';
 import { HistoryItem } from './HistoryItem';
 import { binDates } from './date-binning';
+import { Settings } from './Settings';
+import { DEFAULT_PROVIDER, DEFAULT_MODEL } from '~/utils/constants';
+import Cookies from 'js-cookie';
 
 const menuVariants = {
   closed: {
@@ -38,6 +41,10 @@ export function Menu() {
   const [list, setList] = useState<ChatHistoryItem[]>([]);
   const [open, setOpen] = useState(false);
   const [dialogContent, setDialogContent] = useState<DialogContent>(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [apiKeys, setApiKeys] = useState<Record<string, string>>({});
+  const [provider, setProvider] = useState(DEFAULT_PROVIDER);
+  const [model, setModel] = useState(DEFAULT_MODEL);
 
   const loadEntries = useCallback(() => {
     if (db) {
@@ -70,6 +77,17 @@ export function Menu() {
 
   const closeDialog = () => {
     setDialogContent(null);
+  };
+
+  const updateApiKey = (provider: string, key: string) => {
+    const updatedApiKeys = { ...apiKeys, [provider]: key };
+    setApiKeys(updatedApiKeys);
+    Cookies.set('apiKeys', JSON.stringify(updatedApiKeys), {
+      expires: 30,
+      secure: true,
+      sameSite: 'strict',
+      path: '/'
+    });
   };
 
   useEffect(() => {
@@ -163,8 +181,30 @@ export function Menu() {
             </Dialog>
           </DialogRoot>
         </div>
-        <div className="flex items-center border-t border-bolt-elements-borderColor p-4">
-          <ThemeSwitch className="ml-auto" />
+        <div className="flex flex-col border-t border-bolt-elements-borderColor">
+          <button
+            onClick={() => setShowSettings(!showSettings)}
+            className="flex items-center gap-2 p-4 hover:bg-bolt-elements-sidebar-buttonBackgroundHover transition-colors"
+          >
+            <div className="i-ph:gear" />
+            <span>Settings</span>
+            <div className={`i-ph:caret-right ml-auto transition-transform ${showSettings ? 'rotate-90' : ''}`} />
+          </button>
+          
+          {showSettings && (
+            <Settings
+              provider={provider}
+              apiKey={apiKeys[provider] || ''}
+              model={model}
+              updateApiKey={updateApiKey}
+              setModel={setModel}
+              setProvider={setProvider}
+            />
+          )}
+          
+          <div className="flex items-center p-4">
+            <ThemeSwitch className="ml-auto" />
+          </div>
         </div>
       </div>
     </motion.div>

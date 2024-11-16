@@ -21,6 +21,9 @@ const logger = createScopedLogger('BaseChat');
 
 import styles from './BaseChat.module.scss';
 
+const TEXTAREA_MIN_HEIGHT = 76;
+const TEXTAREA_MAX_HEIGHT = 400;
+
 const EXAMPLE_PROMPTS = [
   { text: 'Build a todo app in React using Tailwind' },
   { text: 'Build a simple blog using Astro' },
@@ -28,52 +31,6 @@ const EXAMPLE_PROMPTS = [
   { text: 'Make a space invaders game' },
   { text: 'How do I center a div?' },
 ];
-
-const providerList = [...new Set(MODEL_LIST.map((model) => model.provider))]
-
-const ModelSelector = ({ model, setModel, provider, setProvider, modelList, providerList }) => {
-  return (
-    <div className="mb-2 flex gap-2">
-      <select 
-        value={provider}
-        onChange={(e) => {
-          setProvider(e.target.value);
-          const firstModel = [...modelList].find(m => m.provider == e.target.value);
-          setModel(firstModel ? firstModel.name : '');
-        }}
-        className="flex-1 p-2 rounded-lg border border-bolt-elements-borderColor bg-bolt-elements-prompt-background text-bolt-elements-textPrimary focus:outline-none focus:ring-2 focus:ring-bolt-elements-focus transition-all"
-      >
-        {providerList.map((provider) => (
-          <option key={provider} value={provider}>
-            {provider}
-          </option>
-        ))}
-        <option key="Ollama" value="Ollama">
-          Ollama
-        </option>
-        <option key="OpenAILike" value="OpenAILike">
-          OpenAILike
-        </option>
-        <option key="LMStudio" value="LMStudio">
-          LMStudio
-        </option>
-      </select>
-      <select
-        value={model}
-        onChange={(e) => setModel(e.target.value)}
-        className="flex-1 p-2 rounded-lg border border-bolt-elements-borderColor bg-bolt-elements-prompt-background text-bolt-elements-textPrimary focus:outline-none focus:ring-2 focus:ring-bolt-elements-focus transition-all"
-      >
-        {[...modelList].filter(e => e.provider == provider && e.name).map((modelOption) => (
-          <option key={modelOption.name} value={modelOption.name}>
-            {modelOption.label}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
-};
-
-const TEXTAREA_MIN_HEIGHT = 76;
 
 interface BaseChatProps {
   textareaRef?: React.RefObject<HTMLTextAreaElement> | undefined;
@@ -120,8 +77,6 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
     },
     ref,
   ) => {
-    const TEXTAREA_MAX_HEIGHT = chatStarted ? 400 : 200;
-    const [apiKeys, setApiKeys] = useState<Record<string, string>>({});
     const [showGithubForm, setShowGithubForm] = useState(false);
     const [githubUsername, setGithubUsername] = useState('');
     const [githubRepo, setGithubRepo] = useState('');
@@ -129,49 +84,11 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
     const [loadingStatus, setLoadingStatus] = useState('');
     const [error, setError] = useState<string | null>(null);
 
-    useEffect(() => {
-      // Load API keys from cookies on component mount
-      try {
-        const storedApiKeys = Cookies.get('apiKeys');
-        if (storedApiKeys) {
-          const parsedKeys = JSON.parse(storedApiKeys);
-          if (typeof parsedKeys === 'object' && parsedKeys !== null) {
-            setApiKeys(parsedKeys);
-          }
-        }
-      } catch (error) {
-        console.error('Error loading API keys from cookies:', error);
-        // Clear invalid cookie data
-        Cookies.remove('apiKeys');
-      }
-    }, []);
-
-    const updateApiKey = (provider: string, key: string) => {
-      try {
-        const updatedApiKeys = { ...apiKeys, [provider]: key };
-        setApiKeys(updatedApiKeys);
-        // Save updated API keys to cookies with 30 day expiry and secure settings
-        Cookies.set('apiKeys', JSON.stringify(updatedApiKeys), {
-          expires: 30, // 30 days
-          secure: true, // Only send over HTTPS
-          sameSite: 'strict', // Protect against CSRF
-          path: '/' // Accessible across the site
-        });
-      } catch (error) {
-        console.error('Error saving API keys from cookies:', error);
-      }
-    };
-
     const handleGithubSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
       event.preventDefault();
       event.stopPropagation();
 
-      logger.debug('Form submitted');
-      console.log('Form submitted');
-
       if (!githubUsername || !githubRepo) {
-        logger.debug('Missing required fields');
-        console.log('Missing required fields');
         return;
       }
       
@@ -179,42 +96,19 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
       setError(null);
       setLoadingStatus('Initializing...');
       
-      logger.debug(`Starting GitHub project setup: ${githubUsername}/${githubRepo}`);
-      console.log(`Starting GitHub project setup: ${githubUsername}/${githubRepo}`);
-
       try {
-        // Load the GitHub repository files into the WebContainer
         setLoadingStatus('Loading repository files...');
-        logger.debug('Calling setupGitHubProject...');
-        console.log('Calling setupGitHubProject...');
+        const result = await setupGitHubProject(githubUsername, githubRepo);
         
-        const result = await setupGitHubProject(githubUsername, githubRepo).catch(error => {
-          logger.error('Error in setupGitHubProject:', error);
-          console.error('Error in setupGitHubProject:', error);
-          throw error;
-        });
-        
-        logger.debug('Repository files loaded successfully:', result);
-        console.log('Repository files loaded successfully:', result);
-        
-        // Start a chat session about the loaded project
         setLoadingStatus('Starting chat session...');
         const message = `I've loaded the GitHub repository ${githubUsername}/${githubRepo}. The files are now available in the WebContainer. Please help me analyze and modify this project.`;
         
-        logger.debug('Starting chat session with message:', message);
-        console.log('Starting chat session with message:', message);
-        
-        // Create a synthetic event for sendMessage
         const syntheticEvent = new Event('click') as any;
         await sendMessage?.(syntheticEvent, message);
         
         setShowGithubForm(false);
-        logger.debug('GitHub project setup completed');
-        console.log('GitHub project setup completed');
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-        logger.error('Error in GitHub project setup:', errorMessage);
-        console.error('Error in GitHub project setup:', errorMessage);
         setError(errorMessage);
         toast.error(`Failed to load GitHub repository: ${errorMessage}`);
       } finally {
@@ -245,11 +139,7 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                 </p>
                 {!showGithubForm ? (
                   <button
-                    onClick={() => {
-                      logger.debug('Opening GitHub form');
-                      console.log('Opening GitHub form');
-                      setShowGithubForm(true);
-                    }}
+                    onClick={() => setShowGithubForm(true)}
                     className="px-6 py-3 bg-gradient-to-r from-indigo-500 to-violet-500 text-white rounded-lg hover:opacity-90 transition-opacity animate-fade-in animation-delay-300"
                   >
                     Continue with an existing project
@@ -277,8 +167,6 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                         <button
                           type="button"
                           onClick={() => {
-                            logger.debug('Canceling GitHub form');
-                            console.log('Canceling GitHub form');
                             setShowGithubForm(false);
                             setError(null);
                           }}
@@ -339,19 +227,6 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                   'sticky bottom-0': chatStarted,
                 })}
               >
-                <ModelSelector
-                  model={model}
-                  setModel={setModel}
-                  modelList={MODEL_LIST}
-                  provider={provider}
-                  setProvider={setProvider}
-                  providerList={providerList}
-                />
-                <APIKeyManager
-                  provider={provider}
-                  apiKey={apiKeys[provider] || ''}
-                  setApiKey={(key) => updateApiKey(provider, key)}
-                />
                 <div
                   className={classNames(
                     'shadow-lg border border-bolt-elements-borderColor bg-bolt-elements-prompt-background backdrop-filter backdrop-blur-[8px] rounded-lg overflow-hidden transition-all',
@@ -367,17 +242,14 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                         }
 
                         event.preventDefault();
-
                         sendMessage?.(event);
                       }
                     }}
                     value={input}
-                    onChange={(event) => {
-                      handleInputChange?.(event);
-                    }}
+                    onChange={handleInputChange}
                     style={{
                       minHeight: TEXTAREA_MIN_HEIGHT,
-                      maxHeight: TEXTAREA_MAX_HEIGHT,
+                      maxHeight: chatStarted ? TEXTAREA_MAX_HEIGHT : 200,
                     }}
                     placeholder="How can Matt AI help you today?"
                     translate="no"
@@ -392,7 +264,6 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                             handleStop?.();
                             return;
                           }
-
                           sendMessage?.(event);
                         }}
                       />
@@ -408,7 +279,7 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                           'text-bolt-elements-item-contentAccent! pr-1.5 enabled:hover:bg-bolt-elements-item-backgroundAccent!':
                             promptEnhanced,
                         })}
-                        onClick={() => enhancePrompt?.()}
+                        onClick={enhancePrompt}
                       >
                         {enhancingPrompt ? (
                           <>
@@ -436,20 +307,16 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
             {!chatStarted && (
               <div id="examples" className="relative w-full max-w-xl mx-auto mt-8 flex justify-center">
                 <div className="flex flex-col space-y-2 [mask-image:linear-gradient(to_bottom,black_0%,transparent_180%)] hover:[mask-image:none]">
-                  {EXAMPLE_PROMPTS.map((examplePrompt, index) => {
-                    return (
-                      <button
-                        key={index}
-                        onClick={(event) => {
-                          sendMessage?.(event, examplePrompt.text);
-                        }}
-                        className="group flex items-center w-full gap-2 justify-center bg-transparent text-bolt-elements-textTertiary hover:text-bolt-elements-textPrimary transition-theme"
-                      >
-                        {examplePrompt.text}
-                        <div className="i-ph:arrow-bend-down-left" />
-                      </button>
-                    );
-                  })}
+                  {EXAMPLE_PROMPTS.map((examplePrompt, index) => (
+                    <button
+                      key={index}
+                      onClick={(event) => sendMessage?.(event, examplePrompt.text)}
+                      className="group flex items-center w-full gap-2 justify-center bg-transparent text-bolt-elements-textTertiary hover:text-bolt-elements-textPrimary transition-theme"
+                    >
+                      {examplePrompt.text}
+                      <div className="i-ph:arrow-bend-down-left" />
+                    </button>
+                  ))}
                 </div>
               </div>
             )}
