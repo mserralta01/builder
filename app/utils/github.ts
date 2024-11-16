@@ -1,5 +1,4 @@
 import { webcontainer, webcontainerContext, getWebContainerStatus } from '~/lib/webcontainer';
-import { WORK_DIR } from './constants';
 import { createScopedLogger } from '~/utils/logger';
 
 const logger = createScopedLogger('GitHub');
@@ -36,11 +35,11 @@ export async function setupGitHubProject(username: string, repo: string) {
   console.log(`Setting up GitHub project: ${username}/${repo}`);
   
   // Clear any existing files in the work directory
-  logger.debug(`Clearing work directory: ${WORK_DIR}`);
-  console.log(`Clearing work directory: ${WORK_DIR}`);
+  logger.debug('Clearing work directory');
+  console.log('Clearing work directory');
   try {
-    await instance.fs.rm(WORK_DIR, { recursive: true, force: true });
-    await instance.fs.mkdir(WORK_DIR, { recursive: true });
+    await instance.fs.rm('.', { recursive: true, force: true });
+    await instance.fs.mkdir('.', { recursive: true });
   } catch (error) {
     logger.error('Error clearing work directory:', error);
     console.error('Error clearing work directory:', error);
@@ -74,7 +73,7 @@ export async function setupGitHubProject(username: string, repo: string) {
     console.log(`Processing ${entries.length} entries from ${path || 'root'}`);
 
     for (const entry of entries) {
-      const fullPath = `${WORK_DIR}/${entry.path}`;
+      const fullPath = entry.path;  // Use the entry path directly since we're already in the project root
       logger.debug(`Processing entry: ${entry.path} (${entry.type})`);
       console.log(`Processing entry: ${entry.path} (${entry.type})`);
 
@@ -93,14 +92,16 @@ export async function setupGitHubProject(username: string, repo: string) {
       } else if (entry.type === 'file') {
         // Create parent directories if they don't exist
         const dirPath = fullPath.split('/').slice(0, -1).join('/');
-        logger.debug(`Ensuring directory exists: ${dirPath}`);
-        console.log(`Ensuring directory exists: ${dirPath}`);
-        try {
-          await instance.fs.mkdir(dirPath, { recursive: true });
-        } catch (error) {
-          logger.error(`Error creating directory ${dirPath}:`, error);
-          console.error(`Error creating directory ${dirPath}:`, error);
-          throw error;
+        if (dirPath) {  // Only create directory if there is a path (skip for root files)
+          logger.debug(`Ensuring directory exists: ${dirPath}`);
+          console.log(`Ensuring directory exists: ${dirPath}`);
+          try {
+            await instance.fs.mkdir(dirPath, { recursive: true });
+          } catch (error) {
+            logger.error(`Error creating directory ${dirPath}:`, error);
+            console.error(`Error creating directory ${dirPath}:`, error);
+            throw error;
+          }
         }
 
         let content: string;
@@ -144,7 +145,7 @@ export async function setupGitHubProject(username: string, repo: string) {
     console.log('Successfully loaded GitHub repository');
     
     // Verify files were written
-    const files = await instance.fs.readdir(WORK_DIR);
+    const files = await instance.fs.readdir('.');
     logger.debug(`Files in work directory: ${JSON.stringify(files)}`);
     console.log(`Files in work directory: ${JSON.stringify(files)}`);
     

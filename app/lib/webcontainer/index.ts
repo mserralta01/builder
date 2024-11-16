@@ -18,7 +18,7 @@ if (import.meta.hot) {
 }
 
 export let webcontainer: Promise<WebContainer> = new Promise(() => {
-  // noop for ssr
+  // noop for ssr2
 });
 
 if (!import.meta.env.SSR) {
